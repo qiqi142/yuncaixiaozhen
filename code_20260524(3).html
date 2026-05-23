@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>云财小政 - 大病退税智能助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            height: 100%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: #007aff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 0 0 20px 20px;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 4px;
+        }
+        .header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .msg-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            max-width: 85%;
+        }
+        /* 头像样式+微动效动画 */
+        .bot-avatar {
+            width: 60px;
+            height: auto;
+            flex-shrink: 0;
+            /* 循环缓慢摇摆动画 */
+            animation: avatarSwing 3.5s ease-in-out infinite alternate;
+            /* 以底部为旋转轴心，更贴合人物站姿 */
+            transform-origin: bottom center;
+        }
+        /* 定义摇摆关键帧动画 */
+        @keyframes avatarSwing {
+            0% {
+                transform: rotate(-2.5deg);
+            }
+            100% {
+                transform: rotate(2.5deg);
+            }
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 20px;
+            word-wrap: break-word;
+            line-height: 1.5;
+            font-size: 15px;
+        }
+        .user {
+            background: #007aff;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            margin-left: auto;
+        }
+        .bot {
+            background: #e4e6eb;
+            color: #111;
+            border-bottom-left-radius: 4px;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+            padding: 12px 16px;
+            background: white;
+            border-top: 1px solid #ddd;
+        }
+        input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            font-size: 16px;
+            outline: none;
+        }
+        button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 0 22px;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:active {
+            opacity: 0.7;
+        }
+        .status {
+            font-size: 12px;
+            color: #6c757d;
+            text-align: center;
+            padding: 8px;
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>云财小政</h1>
+        <p>大病医疗个税退税智能助手</p>
+    </div>
+
+    <div class="chat-box" id="chatBox">
+        <div class="msg-item">
+            <img src="https://s41.ax1x.com/2026/05/24/pm916y9.png" class="bot-avatar" alt="小政">
+            <div class="message bot">你好！我是云财小政，专注于大病医疗个税退税咨询。有什么问题可以问我~</div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="输入你的问题...">
+        <button id="sendBtn">发送</button>
+    </div>
+    <div class="status" id="status">✅ 就绪</div>
+</div>
+
+<script>
+    // 已填入你的API密钥
+    const API_KEY = "sk-e25944eafbda438e84d7b9d9c016cc74";
+    const MODEL_NAME = "qwen-plus";
+    const API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+    
+    const chatBox = document.getElementById('chatBox');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const statusDiv = document.getElementById('status');
+
+    const avatarMap = [
+        { 
+            keywords: ['你好', '您好', 'hi', 'hello', '介绍', '助手'], 
+            url: 'https://s41.ax1x.com/2026/05/24/pm916y9.png' 
+        },
+        { 
+            keywords: ['需要', '帮我', '如何', '怎么', '步骤', '流程'], 
+            url: 'https://s41.ax1x.com/2026/05/24/pm914JO.png' 
+        },
+        { 
+            keywords: ['确认', '完成', '成功', '可以', 'ok', '好的'], 
+            url: 'https://s41.ax1x.com/2026/05/24/pm91oSe.png' 
+        },
+        { 
+            keywords: ['哪里', '哪个', '看哪里', '点哪里', '怎么找'], 
+            url: 'https://s41.ax1x.com/2026/05/24/pm91TQH.png' 
+        }
+    ];
+    const DEFAULT_AVATAR = 'https://s41.ax1x.com/2026/05/24/pm916y9.png';
+
+    function selectAvatar(userMessage) {
+        const lowerMsg = userMessage.toLowerCase();
+        for (const item of avatarMap) {
+            if (item.keywords.some(k => lowerMsg.includes(k))) return item.url;
+        }
+        return DEFAULT_AVATAR;
+    }
+
+    function addMessage(text, isUser, avatarUrl) {
+        if (isUser) {
+            const msg = document.createElement('div');
+            msg.className = 'message user';
+            msg.textContent = text;
+            chatBox.appendChild(msg);
+        } else {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'msg-item';
+            wrapper.innerHTML = `
+                <img src="${avatarUrl}" class="bot-avatar" alt="小政">
+                <div class="message bot">${text}</div>
+            `;
+            chatBox.appendChild(wrapper);
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendMessage() {
+        const question = userInput.value.trim();
+        if (!question) return;
+        addMessage(question, true);
+        userInput.value = '';
+        statusDiv.innerText = '⌛ 思考中...';
+
+        try {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: MODEL_NAME,
+                    messages: [
+                        { role: "system", content: "你是云财小政，大病医疗个税退税助手，回答亲切专业" },
+                        { role: "user", content: question }
+                    ]
+                })
+            });
+            if (!res.ok) throw new Error('请求异常');
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message);
+
+            const reply = data.choices[0].message.content;
+            const useAvatar = selectAvatar(question);
+            addMessage(reply, false, useAvatar);
+            statusDiv.innerText = '✅ 已回复';
+        } catch (err) {
+            const useAvatar = selectAvatar(question);
+            addMessage(`⚠️ 出错了：${err.message}`, false, useAvatar);
+            statusDiv.innerText = '❌ 连接失败';
+        }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', e => e.key === 'Enter' && sendMessage());
+</script>
+</body>
+</html>
