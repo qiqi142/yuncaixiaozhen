@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云财小政 - 大病退税智能助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            height: 100%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: #007aff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 0 0 20px 20px;
+        }
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .message {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            max-width: 85%;
+        }
+        .bot {
+            align-self: flex-start;
+        }
+        .user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        /* 人物大小适中，全程自然微动 */
+        .bot-avatar {
+            width: 65px;
+            height: auto;
+            object-fit: contain;
+            border-radius: 0;
+            flex-shrink: 0;
+            animation: breathe 4s infinite ease-in-out;
+        }
+
+        .bubble {
+            padding: 10px 14px;
+            border-radius: 18px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .bot .bubble {
+            background: #e4e6eb;
+            color: #111;
+            border-bottom-left-radius: 4px;
+        }
+        .user .bubble {
+            background: #007aff;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+            padding: 12px 16px;
+            border-top: 1px solid #eee;
+        }
+        input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            font-size: 16px;
+            outline: none;
+        }
+        button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 0 22px;
+            border-radius: 30px;
+            font-size: 16px;
+        }
+        .status {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            padding: 6px;
+            background: #f8f9fa;
+        }
+
+        /* 呼吸微动：超级自然、一直晃、不夸张 */
+        @keyframes breathe {
+            0%   { transform: translateY(0px) rotate(0deg); }
+            25%  { transform: translateY(-0.5px) rotate(0.1deg); }
+            50%  { transform: translateY(0px) rotate(0deg); }
+            75%  { transform: translateY(-0.5px) rotate(-0.1deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        /* 温柔挥手 */
+        @keyframes wave {
+            0%   { transform: rotate(0deg); }
+            50%  { transform: rotate(2deg); }
+            100% { transform: rotate(0deg); }
+        }
+        .wave-animation {
+            animation: wave 1.2s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>云财小政</h1>
+        <p>大病医疗个税退税智能助手</p>
+    </div>
+    <div class="chat-box" id="chatBox">
+        <div class="message bot">
+            <img id="botAvatar" class="bot-avatar" src="https://s41.ax1x.com/2026/05/25/pmCY1Og.png">
+            <div class="bubble">你好！我是云财小政，专注于大病医疗个税退税咨询。</div>
+        </div>
+    </div>
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="请输入问题...">
+        <button id="sendBtn">发送</button>
+    </div>
+    <div class="status" id="status">✅ 已连接 AI 服务</div>
+</div>
+
+<script>
+const API_KEY = "sk-e25944eafbda438e84d7b9d9c016cc74";
+const MODEL_NAME = "qwen-plus";
+const API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+
+const chatBox = document.getElementById('chatBox');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const status = document.getElementById('status');
+const botAvatar = document.getElementById('botAvatar');
+
+const avatarList = {
+  normal: "https://s41.ax1x.com/2026/05/25/pmCY1Og.png",
+  smile: "https://s41.ax1x.com/2026/05/25/pmCYUf0.png",
+  happy: "https://s41.ax1x.com/2026/05/25/pmCYWp6.png",
+  serious: "https://s41.ax1x.com/2026/05/25/pmCYf1K.png"
+};
+
+// 加载挥手
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    botAvatar.classList.add('wave-animation');
+    setTimeout(() => botAvatar.classList.remove('wave-animation'), 1200);
+  }, 600);
+});
+
+function setAvatar(mode) {
+  botAvatar.src = avatarList[mode] || avatarList.normal;
+}
+
+function addMsg(text, isUser) {
+  const msg = document.createElement('div');
+  msg.className = `message ${isUser ? 'user' : 'bot'}`;
+
+  if (!isUser) {
+    const img = document.createElement('img');
+    img.className = 'bot-avatar';
+    img.src = botAvatar.src;
+    msg.appendChild(img);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  msg.appendChild(bubble);
+
+  chatBox.appendChild(msg);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+async function send() {
+  const text = userInput.value.trim();
+  if (!text) return;
+
+  addMsg(text, true);
+  userInput.value = '';
+  status.textContent = '⌛ 思考中...';
+
+  if (text.includes('你好') || text.includes('嗨')) {
+    setAvatar('smile');
+    botAvatar.classList.add('wave-animation');
+    setTimeout(() => botAvatar.classList.remove('wave-animation'), 1200);
+  } else if (text.includes('谢谢') || text.includes('好')) {
+    setAvatar('happy');
+  } else if (text.includes('退税') || text.includes('办理') || text.includes('怎么')) {
+    setAvatar('serious');
+  } else {
+    setAvatar('normal');
+  }
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + API_KEY
+      },
+      body: JSON.stringify({
+        model: MODEL_NAME,
+        messages: [
+          { role: "system", content: "你是云财小政，大病医疗个税退税助手，专业、简洁、亲切回答。" },
+          { role: "user", content: text }
+        ]
+      })
+    });
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || '抱歉，暂时无法回答';
+    addMsg(reply, false);
+    status.textContent = '✅ 回复完成';
+    setTimeout(() => setAvatar('normal'), 1000);
+  } catch (err) {
+    addMsg('⚠️ 连接失败：' + err.message, false);
+    status.textContent = '❌ 连接失败';
+  }
+}
+
+sendBtn.onclick = send;
+userInput.addEventListener('keypress', e => e.key === 'Enter' && send());
+</script>
+</body>
+</html>
